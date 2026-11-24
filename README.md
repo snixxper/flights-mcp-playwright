@@ -2,6 +2,8 @@
 
 Search Google Flights from **Claude Desktop**, in plain language.
 
+![Asking Claude for the cheapest day to fly Lima to Cusco, and getting a table of real prices](docs/demo.gif)
+
 A small local [MCP](https://modelcontextprotocol.io) server that searches Google Flights in a **real browser**, so it gets the same results you see.
 
 **Free · no account or API key · one file · runs on your own machine**
