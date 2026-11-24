@@ -26,10 +26,20 @@ from mcp.server.fastmcp import FastMCP
 from playwright.async_api import TimeoutError as PWTimeout
 from playwright.async_api import async_playwright
 
-UA = (
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
-    "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
-)
+# Report the real OS: a Mac user agent on a Windows machine looks like a bot.
+OS_TOKEN = {
+    "win32": "Windows NT 10.0; Win64; x64",
+    "darwin": "Macintosh; Intel Mac OS X 10_15_7",
+}.get(sys.platform, "X11; Linux x86_64")
+
+
+def user_agent(browser_version: str) -> str:
+    major = browser_version.split(".")[0]
+    return (
+        f"Mozilla/5.0 ({OS_TOKEN}) AppleWebKit/537.36 "
+        f"(KHTML, like Gecko) Chrome/{major}.0.0.0 Safari/537.36"
+    )
+
 RESULT_SEL = '[aria-label*="Total duration"]'
 CABINS = {
     "economy": "",
@@ -131,10 +141,14 @@ def keep(flight: dict, max_price: float | None, max_stops: int | None, airlines:
 @asynccontextmanager
 async def browser_context(headless: bool = True):
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=headless)
+        # channel="chromium" runs the full browser in Chrome's "new" headless mode,
+        # which Google treats like a normal browser (the old headless shell gets no results).
+        browser = await p.chromium.launch(headless=headless, channel="chromium")
         try:
             yield await browser.new_context(
-                user_agent=UA, locale="en-US", viewport={"width": 1280, "height": 900}
+                user_agent=user_agent(browser.version),
+                locale="en-US",
+                viewport={"width": 1280, "height": 900},
             )
         finally:
             await browser.close()
