@@ -24,7 +24,10 @@ Google Flights now loads its results with JavaScript inside the browser. Tools t
 ## Features
 
 - One-way and round-trip searches
+- Filters: cabin class, number of adults, nonstop / max stops, max price, airlines
+- **Cheapest-day finder**: scans up to 14 departure dates and tells you the cheapest one
 - Price, airline, stops, departure and arrival times, duration, and layovers
+- A Google Flights link with every search, so you can open it and book
 - Any currency (`USD`, `PEN`, `EUR`, …)
 - One file, no project setup: [uv](https://docs.astral.sh/uv/) installs the dependencies for you
 - Runs on macOS and Windows
@@ -59,6 +62,12 @@ uv run --script https://raw.githubusercontent.com/snixxper/flights-mcp-playwrigh
 
 Add a return date for a round trip. Add `--show` to watch the browser work.
 
+To find the cheapest day in a range (here: 4-night round trips leaving Jan 5–11):
+
+```bash
+uv run --script https://raw.githubusercontent.com/snixxper/flights-mcp-playwright/main/flights_pw.py --dates LIM CUZ 2027-01-05 2027-01-11 4
+```
+
 ### 4. Add it to Claude Desktop
 
 In Claude Desktop, open **Settings → Developer → Edit Config**, and add this inside `"mcpServers"`:
@@ -85,9 +94,11 @@ Save the file, quit Claude Desktop completely, and reopen it. **flights-pw** sho
 
 > Pointing the config at the GitHub URL means you always run the latest version. To pin a version, download `flights_pw.py` and use its local path instead.
 
-## Tool reference
+## Tools
 
-`search_flights(origin, destination, date, return_date=None, currency="USD", max_results=10)`
+### `search_flights`
+
+Flights for one date.
 
 | Parameter | Example | Notes |
 |---|---|---|
@@ -95,10 +106,30 @@ Save the file, quit Claude Desktop completely, and reopen it. **flights-pw** sho
 | `destination` | `"CUZ"` | IATA airport code |
 | `date` | `"2027-01-10"` | `YYYY-MM-DD` |
 | `return_date` | `"2027-01-14"` | Leave it out for one-way |
+| `cabin` | `"business"` | `economy`, `premium_economy`, `business`, `first` |
+| `adults` | `2` | Prices are the total for all passengers |
+| `max_stops` | `0` | `0` = nonstop only, `1` = at most one stop |
+| `max_price` | `500` | Drop flights above this total price |
+| `airlines` | `["LATAM", "Copa"]` | Keep only these airlines |
 | `currency` | `"PEN"` | ISO 4217 code |
 | `max_results` | `10` | Top N results |
 
 For round trips, prices are the total for both ways, and the list shows outbound flights.
+
+### `find_cheapest_dates`
+
+The cheapest flight for each departure day in a range, plus the cheapest day overall.
+
+| Parameter | Example | Notes |
+|---|---|---|
+| `origin`, `destination` | `"LIM"`, `"CUZ"` | IATA airport codes |
+| `start_date`, `end_date` | `"2027-01-05"`, `"2027-01-11"` | Up to 14 days |
+| `trip_length` | `4` | Nights for a round trip. Leave it out for one-way |
+| `cabin`, `adults`, `max_stops`, `currency` | | Same as above |
+
+It loads 4 pages at a time, so a full week takes about 20–30 seconds.
+
+> Example: *"What's the cheapest day to fly Lima → Cusco between Jan 5 and 11, coming back 4 nights later?"* → **Thu Jan 7, $117 round trip, LATAM nonstop**
 
 ## How it works
 
@@ -113,6 +144,7 @@ For round trips, prices are the total for both ways, and the list shows outbound
 - **Personal, low-volume use only.** This reads Google Flights pages, which Google's terms of service don't allow. Too many searches may get you a captcha or a temporary block.
 - Each search takes about 5–10 seconds while the browser loads.
 - Multi-city searches aren't supported yet.
+- The cheapest-day finder runs one search per day, so keep ranges short (it's capped at 14 days).
 
 ## License
 
