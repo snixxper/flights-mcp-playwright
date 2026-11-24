@@ -2,7 +2,11 @@
 
 Search Google Flights from **Claude Desktop**, in plain language.
 
-A small local [MCP](https://modelcontextprotocol.io) server. It opens Google Flights in a hidden Chromium browser using [Playwright](https://playwright.dev/python/), reads the results, and gives Claude a short, clean list of flights. Claude gets about 30 lines of data, not whole web pages, so searches use very few tokens.
+A small local [MCP](https://modelcontextprotocol.io) server that searches Google Flights in a **real browser**, so it gets the same results you see.
+
+**Free · no account or API key · one file · runs on your own machine**
+
+It uses [Playwright](https://playwright.dev/python/) to open Google Flights in a hidden Chromium browser, reads the results, and gives Claude a short, clean list of flights. Claude gets about 30 lines of data, not whole web pages, so searches use very few tokens.
 
 > "Find me a round trip from Lima to Cusco, Jan 10–14"
 
@@ -137,6 +141,19 @@ It loads 4 pages at a time, so a full week takes about 20–30 seconds.
 2. Opens it in headless Chromium and declines the cookie banner if one appears.
 3. Waits for the results, then reads each result's accessibility label (`aria-label`). Google writes those labels in plain sentences, so they change less often than its CSS class names.
 4. Turns each label into a small JSON object.
+
+## Alternatives
+
+There are several Google Flights MCP servers. Here's an honest guide to when each one fits:
+
+| Option | How it gets data | Good when… | Trade-off |
+|---|---|---|---|
+| **This project** | Real headless browser (Playwright) | You want something free and local that sees what a browser sees | ~150 MB browser download; 5–10 s per search; can break when Google changes its page |
+| [fli](https://github.com/punitarani/fli) | Direct requests to Google's internal API | You want a full Python library + CLI with lots of filters | Since Nov 2026, Google redirects its requests to an "unsupported" page ([#270](https://github.com/punitarani/fli/issues/270)) |
+| [fast-flights](https://github.com/AWeirdDev/flights) and MCP servers built on it | Encoded Google Flights URLs | You want a fast, lightweight Python library | The README notes a proxy is usually needed to avoid bot detection |
+| SerpAPI / hosted APIs (e.g. HasData) | Paid scraping service | You need reliable uptime or high volume | Needs an account and API key; free tiers are limited |
+
+If this one stops working, check the [issues](https://github.com/snixxper/flights-mcp-playwright/issues), or use one of the paid options as a fallback.
 
 ## Limitations
 
