@@ -254,7 +254,13 @@ def rate_deal(price: float | None, ins: dict | None = None, median: float | None
         )
     elif median:
         pct = round((price - median) / median * 100)
-        notes.append(f"{abs(pct)}% {'below' if pct < 0 else 'above'} the middle price of the dates checked ({median:g})")
+        if pct == 0:
+            notes.append(f"same as most of the other dates checked ({median:g}); no price history available")
+        else:
+            notes.append(
+                f"{abs(pct)}% {'below' if pct < 0 else 'above'} the middle price of the other dates checked "
+                f"({median:g}); no price history available"
+            )
     if rating:
         notes.append(f"Google rates it {rating}")
     if rng:
@@ -489,8 +495,15 @@ async def scrape_trip_deals(
         medians = {d: median([o["_total"] for o in options if o["destination"] == d]) for d in dests}
 
         async def insight(o):
-            async with sem:
-                return await read_labels(ctx, o["google_flights_link"], with_insights=True)
+            for attempt in range(2):  # retry once: the price history sometimes loads slowly
+                async with sem:
+                    try:
+                        labels, ins = await read_labels(ctx, o["google_flights_link"], with_insights=True)
+                    except Exception:
+                        ins = None
+                if ins and ins.get("history"):
+                    return labels, ins
+            return [], ins
 
         insights = await asyncio.gather(*(insight(o) for o in top), return_exceptions=True)
         for i, o in enumerate(top):
@@ -519,6 +532,11 @@ async def scrape_trip_deals(
     }
     if over_budget:
         out["note"] = f"Nothing fit the budget of {budget_per_person:g} per person; showing the cheapest options instead."
+    elif budget_per_person is not None:
+        shown = {o["destination"] for o in top}
+        over = {d: lo / adults for d, (lo, _) in seen.items() if d not in shown and lo / adults > budget_per_person}
+        if over:
+            out["over_budget"] = {d: f"cheapest found was {p:g} per person" for d, p in over.items()}
     missing = [d for d in dests if d not in seen]
     if missing:
         out["no_results_for"] = missing
