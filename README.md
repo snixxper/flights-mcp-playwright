@@ -29,9 +29,12 @@ Google Flights now loads its results with JavaScript inside the browser. Tools t
 
 ## Features
 
+- **Cheap flight catcher**: every search says *how* cheap a price is, compared to the price history for those exact dates (last ~60 days), Google's low / typical / high rating, and its usual price range
+- **Plan a trip from your vacation dates**: give a travel window, a range of nights and up to 5 destinations; it finds the best-value trips that fit
+- **Guided "Plan a trip" prompt**: Claude asks you a few questions, then searches
 - One-way and round-trip searches
 - Filters: cabin class, number of adults, nonstop / max stops, max price, airlines
-- **Cheapest-day finder**: scans up to 14 departure dates and tells you the cheapest one
+- Cheapest-day finder: scans up to 14 departure dates and tells you the cheapest one
 - Price, airline, stops, departure and arrival times, duration, and layovers
 - A Google Flights link with every search, so you can open it and book
 - Any currency (`USD`, `PEN`, `EUR`, …)
@@ -138,6 +141,49 @@ It loads 4 pages at a time, so a full week takes about 20–30 seconds.
 
 > Example: *"What's the cheapest day to fly Lima → Cusco between Jan 5 and 11, coming back 4 nights later?"* → **Thu Jan 7, $117 round trip, LATAM nonstop**
 
+### `find_trip_deals`
+
+For when you know **when** you can travel (say, your approved vacation) but not the exact dates, or you're choosing between places.
+
+| Parameter | Example | Notes |
+|---|---|---|
+| `origin` | `"LIM"` | IATA airport code |
+| `destinations` | `["CUZ", "CTG"]` | Up to 5 |
+| `earliest_departure`, `latest_return` | `"2027-01-05"`, `"2027-01-20"` | Your travel window |
+| `min_nights`, `max_nights` | `5`, `8` | Same number for an exact length |
+| `budget_per_person` | `300` | Optional |
+| `adults`, `cabin`, `max_stops`, `currency` | | Same as above |
+
+It checks up to 24 date combinations (the middle trip length across the window first, then shorter and longer trips around the cheapest days), then rates each option it shows against its price history. Takes about a minute.
+
+> Example: Lima → Cusco or Cartagena, Jan 5–20, 5–8 nights:
+> - **Cheapest:** Cusco, Jan 9 → 15, **$92**: ✅ good price, 16% below its usual price
+> - **Biggest discount:** Cartagena, Jan 14 → 20, **$238**: 🔥 great deal, lowest price for those dates in 60 days, 35% below its usual $366
+>
+> The cheapest trip and the best deal aren't always the same.
+
+### Deal ratings
+
+| Label | Means |
+|---|---|
+| 🔥 great deal | The lowest price for those dates in the last ~60 days, or 20%+ below their average |
+| ✅ good price | 5–20% below the average, or Google rates it *low* |
+| ➖ normal price | Around the usual price |
+| ⚠️ expensive | 10%+ above the average, or Google rates it *high* |
+
+Each rating comes with its reasons, e.g. *"16% below its 60-day average of $109 · Google rates it typical · similar trips usually cost $85–220"*. If Google doesn't show a price history, it compares against the other dates it checked.
+
+### Prompt: "Plan a trip"
+
+In Claude Desktop, pick **Plan a trip** from the **+** menu (under *flights-pw*). Claude asks:
+
+1. When do you want to travel?
+2. Where are you flying from?
+3. Where to? (one place, a few ideas, or "surprise me" + a vibe)
+4. Optional: how many people, budget, must-haves
+
+…then runs the search and explains how good the best deals are.
+
 ## How it works
 
 1. Builds a Google Flights URL from your search.
@@ -164,7 +210,7 @@ If this one stops working, check the [issues](https://github.com/snixxper/flight
 - **Personal, low-volume use only.** This reads Google Flights pages, which Google's terms of service don't allow. Too many searches may get you a captcha or a temporary block.
 - Each search takes about 5–10 seconds while the browser loads.
 - Multi-city searches aren't supported yet.
-- The cheapest-day finder runs one search per day, so keep ranges short (it's capped at 14 days).
+- The cheapest-day finder and trip planner run one search per date combination, so they're capped (14 days and 24 combinations) to stay quick and polite to Google.
 
 ## License
 

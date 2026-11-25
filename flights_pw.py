@@ -505,9 +505,16 @@ async def scrape_trip_deals(
         seen[o["destination"]] = (min(lo, o["_total"]), max(hi, o["_total"]))
     for o in top:
         o.pop("_total"), o.pop("_per_person")
+    rated = [o for o in top if o.get("deal") and "percent_vs_usual" in o["deal"]]
+    best_deal = min(rated, key=lambda o: o["deal"]["percent_vs_usual"], default=None)
     out = {
         "combinations_checked": len(results),
         "best_options": top,
+        "biggest_discount": (
+            {"destination": best_deal["destination"], "depart": best_deal["depart"],
+             "price": best_deal["price"], "percent_vs_usual": best_deal["deal"]["percent_vs_usual"]}
+            if best_deal else None
+        ),
         "price_range_seen": {d: {"min": lo, "max": hi} for d, (lo, hi) in seen.items()},
     }
     if over_budget:
@@ -606,7 +613,9 @@ async def find_trip_deals(
     destinations: IATA codes, e.g. ["CUZ", "CTG", "EZE"].
     budget_per_person: optional, in `currency`.
     Checks up to 24 date combinations, then rates the options shown against the price history
-    for those dates. The best option for every destination is always included. Each option has a deal label (great deal / good price / normal / expensive)
+    for those dates. The best option for every destination is always included.
+    best_options are sorted by price; biggest_discount is the option furthest below its usual
+    price, which can differ from the cheapest one, so mention both when they differ. Each option has a deal label (great deal / good price / normal / expensive)
     with the reasons. Takes about 30-60 seconds.
     """
 
@@ -634,7 +643,7 @@ def plan_trip() -> str:
 
 Then turn my answers into a travel window (earliest_departure, latest_return), a trip length (min_nights, max_nights: "about a week" means 6-8; exact dates mean the same number for both) and IATA airport codes, and call find_trip_deals. If I gave exact dates for one destination, use search_flights instead.
 
-Show the best options as a short table: destination, dates, nights, price, airline, and deal label. Then explain in one or two sentences HOW cheap the best option is, using the deal reasons (compared to the price history for those dates, lowest in N days, Google's usual range). Include the Google Flights link for each option. If I asked for no overnight flights, skip options that depart between midnight and 5 AM."""
+Show the best options as a short table: destination, dates, nights, price, airline, and deal label. Then explain in one or two sentences HOW cheap the best option is, using the deal reasons (compared to the price history for those dates, lowest in N days, Google's usual range). If the biggest discount is not the cheapest option, say so: the cheapest trip and the best deal can be different. Include the Google Flights link for each option. If I asked for no overnight flights, skip options that depart between midnight and 5 AM."""
 
 
 # ---------------------------------------------------------------- CLI
@@ -691,7 +700,10 @@ def main() -> None:
             print(f"{o['destination']}  {o['depart']} -> {o['return']}  {o['nights']} nights  "
                   f"{o['price']}  {o['airline']}  {o['stops']}")
             print(f"     {o['deal']['label']}: {'; '.join(o['deal']['why'])}")
-        print(f"\nRange seen: {res['price_range_seen']}")
+        if res.get("biggest_discount"):
+            b = res["biggest_discount"]
+            print(f"\nBiggest discount: {b['destination']} {b['depart']} {b['price']} ({b['percent_vs_usual']}% vs usual)")
+        print(f"Range seen: {res['price_range_seen']}")
         return
     mcp.run()
 
