@@ -266,6 +266,53 @@ async def scrape_dates(
     return {"cheapest_day": best, "by_date": rows}
 
 
+# ---------------------------------------------------------------- price insights (diagnostic)
+
+
+async def probe_insights(url: str, headless: bool = True) -> None:
+    """Print whatever price-insight / price-history info Google shows for a search."""
+    keys = re.compile(
+        r"usually cost|prices are currently|cheaper than usual|more expensive than usual|"
+        r"typical|price history|low for|high for|days ago|lowest price",
+        re.I,
+    )
+    async with browser_context(headless) as ctx:
+        page = await ctx.new_page()
+        await page.goto(url, wait_until="domcontentloaded", timeout=30000)
+        await page.wait_for_selector(RESULT_SEL, timeout=25000)
+        await page.wait_for_timeout(2500)
+
+        def show(title, lines):
+            print(f"\n=== {title} ({len(lines)}) ===")
+            for line in lines[:25]:
+                print(" ", line[:220])
+
+        text = await page.inner_text("body")
+        show("Page text mentioning prices/history", [l.strip() for l in text.splitlines() if keys.search(l)])
+
+        labels = await page.eval_on_selector_all(
+            "[aria-label]", "els => els.map(e => e.getAttribute('aria-label'))"
+        )
+        show("aria-labels mentioning prices/history", [l for l in labels if l and keys.search(l)])
+
+        buttons = page.get_by_role("button", name=re.compile("price history|price graph|date grid", re.I))
+        n = await buttons.count()
+        print(f"\n=== Price history buttons found: {n} ===")
+        for i in range(n):
+            print("  ", await buttons.nth(i).get_attribute("aria-label") or await buttons.nth(i).inner_text())
+        if n:
+            await buttons.first.click()
+            await page.wait_for_timeout(3000)
+            text2 = await page.inner_text("body")
+            new = [l.strip() for l in text2.splitlines() if l.strip() and l not in text]
+            show("New text after opening price history", new)
+            labels2 = await page.eval_on_selector_all(
+                "[aria-label]", "els => els.map(e => e.getAttribute('aria-label'))"
+            )
+            show("New aria-labels after opening", [l for l in labels2 if l and l not in labels])
+        await page.close()
+
+
 # ---------------------------------------------------------------- MCP tools
 
 mcp = FastMCP("flights-pw")
@@ -347,6 +394,12 @@ def main() -> None:
         for f in res["flights"]:
             print(" | ".join(str(v) for v in f.values()))
         print(f"\n{res['count']} flights · {res['google_flights_link']}")
+        return
+    if args[:1] == ["--insights"]:
+        rest = args[1:]
+        url = build_url(rest[0], rest[1], rest[2], rest[3] if len(rest) > 3 else None)
+        print(url)
+        asyncio.run(probe_insights(url, headless=not show))
         return
     if args[:1] == ["--dates"]:
         rest = args[1:]
