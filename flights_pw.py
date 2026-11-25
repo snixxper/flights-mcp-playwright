@@ -49,7 +49,7 @@ CABINS = {
 }
 MAX_DATE_SPAN = 14
 PARALLEL_PAGES = 4
-MAX_TRIP_SEARCHES = 24  # page loads per find_trip_deals call (plus up to 3 for price history)
+MAX_TRIP_SEARCHES = 24  # page loads per find_trip_deals call (plus up to 5 for price history)
 
 
 # ---------------------------------------------------------------- query + parsing
@@ -475,14 +475,24 @@ async def scrape_trip_deals(
         options.sort(key=lambda o: o["_per_person"])
         within = [o for o in options if budget_per_person is None or o["_per_person"] <= budget_per_person]
         over_budget = bool(options) and not within
-        top = (within or options)[:5]
+        # Best option for each destination first, so every place can be compared; then fill by price.
+        pool = within or options
+        top = []
+        for d in dests:
+            best = next((o for o in pool if o["destination"] == d), None)
+            if best:
+                top.append(best)
+        top += [o for o in pool if o not in top][: max(0, 5 - len(top))]
+        top.sort(key=lambda o: o["_per_person"])
 
-        # How cheap? Price history for the best 3, the other dates checked for the rest.
+        # How cheap? Price history for every option shown (fallback: the other dates checked).
         medians = {d: median([o["_total"] for o in options if o["destination"] == d]) for d in dests}
-        insights = await asyncio.gather(
-            *(read_labels(ctx, o["google_flights_link"], with_insights=True) for o in top[:3]),
-            return_exceptions=True,
-        )
+
+        async def insight(o):
+            async with sem:
+                return await read_labels(ctx, o["google_flights_link"], with_insights=True)
+
+        insights = await asyncio.gather(*(insight(o) for o in top), return_exceptions=True)
         for i, o in enumerate(top):
             ins = insights[i][1] if i < len(insights) and not isinstance(insights[i], Exception) else None
             o["deal"] = rate_deal(o["_total"], ins, medians.get(o["destination"]))
@@ -595,8 +605,8 @@ async def find_trip_deals(
     min_nights / max_nights: trip length range (use the same number for an exact length).
     destinations: IATA codes, e.g. ["CUZ", "CTG", "EZE"].
     budget_per_person: optional, in `currency`.
-    Checks up to 24 date combinations, then rates the best ones against the price history
-    for those dates. Each option has a deal label (great deal / good price / normal / expensive)
+    Checks up to 24 date combinations, then rates the options shown against the price history
+    for those dates. The best option for every destination is always included. Each option has a deal label (great deal / good price / normal / expensive)
     with the reasons. Takes about 30-60 seconds.
     """
 
