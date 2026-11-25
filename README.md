@@ -35,6 +35,7 @@ Google Flights now loads its results with JavaScript inside the browser. Tools t
 - Price, airline, stops, departure and arrival times, duration, and layovers
 - A Google Flights link with every search, so you can open it and book
 - Any currency (`USD`, `PEN`, `EUR`, …)
+- **Works in any language.** Ask Claude in Spanish, Portuguese, French… and it answers in that language. Claude turns your question into airport codes and dates, so *"¿Cuál es el día más barato para volar de Lima a Cusco en enero, en soles?"* works just like the English version
 - One file, no project setup: [uv](https://docs.astral.sh/uv/) installs the dependencies for you
 - Runs on macOS and Windows
 
